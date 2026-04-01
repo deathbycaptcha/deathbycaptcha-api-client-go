@@ -1,0 +1,96 @@
+name: Coverage
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  coverage_go125:
+    name: Coverage Go 1.25
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.25
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-coverage-go-1.25-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-coverage-go-1.25-
+
+      - name: Show versions
+        run: go version
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run coverage
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./deathbycaptcha/... \
+            -coverprofile=coverage.out \
+            -covermode=atomic \
+            -timeout 120s \
+            2>&1 | tee coverage-output.txt
+
+      - name: Generate coverage badge JSON
+        shell: bash
+        run: |
+          LINES_PCT=$(go tool cover -func=coverage.out | grep '^total:' | awk '{gsub(/%/, "", $3); print $3}')
+
+          if [ -z "$LINES_PCT" ]; then
+            echo "WARNING: Could not parse coverage percentage" >&2
+            LINES_PCT="0"
+          fi
+
+          COLOR="red"
+          awk "BEGIN {exit !($LINES_PCT >= 85)}" && COLOR="brightgreen" || true
+          awk "BEGIN {exit !($LINES_PCT >= 70 && $LINES_PCT < 85)}" && COLOR="yellow" || true
+
+          echo "### Coverage (Go 1.25)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Lines coverage:** ${LINES_PCT}%" >> "$GITHUB_STEP_SUMMARY"
+
+          mkdir -p pages
+          printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s"}\n' \
+            "${LINES_PCT}" "${COLOR}" > pages/coverage-badge.json
+          echo "Generated badge JSON:"
+          cat pages/coverage-badge.json
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-go-1.25
+          path: coverage.out
+          if-no-files-found: ignore
+
+      - name: Configure Pages
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
+
+      - name: Deploy to GitHub Pages
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/deploy-pages@v4
