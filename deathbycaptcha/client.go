@@ -32,7 +32,7 @@ import (
 const (
 	// APIVersion is sent as the User-Agent header and as the socket "version"
 	// field so the server can identify this client.
-	APIVersion = "DBC/Go v1.0.0"
+	APIVersion = "DBC/Go v4.7.0"
 
 	// HTTPBaseURL is the canonical HTTPS endpoint.
 	HTTPBaseURL = "https://api.dbcapi.me/api"
