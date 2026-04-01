@@ -16,7 +16,7 @@
 
 ## 📖 Introduction
 
-The [DeathByCaptcha](https://deathbycaptcha.com) Go client is the official library for the DeathByCaptcha **captcha solving service**. It provides a simple, well-documented interface for integrating CAPTCHA solving into automation workflows — a particularly common need when you use it as a **captcha solver for web scraping**, where CAPTCHAs block access to the pages you need to extract data from. It supports both the HTTPS API (encrypted transport — recommended when security is a priority) and the socket-based API (faster and lower latency, recommended for high-throughput production workloads).
+The [DeathByCaptcha](https://deathbycaptcha.com) Go client is the official library for integrating the DeathByCaptcha **bypass captcha service** into your Go applications. Purpose-built as a **captcha solver for bots** and automation pipelines, it provides a simple, well-documented interface for solving image, audio and modern token-based CAPTCHAs — a particularly common requirement when building scrapers or bots where CAPTCHAs block access to the pages you need to process. It supports both the HTTPS API (encrypted transport — recommended when security is a priority) and the socket-based API (faster and lower latency, recommended for high-throughput production workloads).
 
 Compatible with **Go 1.21+** (tested on Go 1.25 and Go 1.26).
 
