@@ -65,6 +65,7 @@ if captcha != nil {
 - [How to Use DBC API Clients](#how-to-use-dbc-api-clients)
     - [Common Clients' Interface](#common-clients-interface)
     - [Available Methods](#captcha-methods)
+    - [Concurrent Usage (Goroutines)](#concurrent-usage-goroutines)
 - [Credentials & Configuration](#credentials--configuration)
     - [Quick Setup](#quick-setup)
 - [CAPTCHA Types Quick Reference & Examples](#captcha-types-reference)
@@ -202,6 +203,122 @@ func main() {
         // client.Report(captcha.CaptchaID)
     }
 }
+```
+
+<a id="concurrent-usage-goroutines"></a>
+### 🔀 Concurrent Usage (Goroutines)
+
+Both `HttpClient` and `SocketClient` are safe for concurrent use:
+
+- **`HttpClient`** — wraps Go's `net/http.Client`, which is goroutine-safe. A single shared instance works; one-per-goroutine is preferred for maximum throughput.
+- **`SocketClient`** — serialises all socket operations with an internal `sync.Mutex`. One instance **per goroutine** is the recommended pattern (independent TCP connections, no head-of-line blocking).
+
+#### HTTP — one `HttpClient` per goroutine
+
+```go
+package main
+
+import (
+    "errors"
+    "fmt"
+    "os"
+    "sync"
+
+    dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha"
+)
+
+func httpWorker(username, password, imagePath string, id int, wg *sync.WaitGroup) {
+    defer wg.Done()
+    client := dbc.NewHttpClient(username, password) // own instance
+    defer client.Close()
+
+    captcha, err := client.Decode(imagePath, dbc.DefaultTimeout, map[string]string{})
+    if err != nil {
+        var ade *dbc.AccessDeniedException
+        if errors.As(err, &ade) {
+            fmt.Fprintf(os.Stderr, "[HTTP %d] access denied\n", id)
+            return
+        }
+        fmt.Fprintf(os.Stderr, "[HTTP %d] error: %v\n", id, err)
+        return
+    }
+    if captcha != nil {
+        fmt.Printf("[HTTP %d] solved %d: %s\n", id, captcha.CaptchaID, *captcha.Text)
+    }
+}
+
+func main() {
+    username := os.Getenv("DBC_USERNAME")
+    password := os.Getenv("DBC_PASSWORD")
+
+    var wg sync.WaitGroup
+    for i := 1; i <= 4; i++ {
+        wg.Add(1)
+        go httpWorker(username, password, "images/normal.jpg", i, &wg)
+    }
+    wg.Wait()
+}
+```
+
+> Full runnable example: [examples/example.Goroutine_Http.go](examples/example.Goroutine_Http.go)
+
+#### Socket — one `SocketClient` per goroutine
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+    "sync"
+
+    dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha"
+)
+
+func socketWorker(username, password, imagePath string, id int, wg *sync.WaitGroup) {
+    defer wg.Done()
+    client := dbc.NewSocketClient(username, password) // own TCP connection
+    defer client.Close()
+
+    captcha, err := client.Decode(imagePath, dbc.DefaultTimeout, map[string]string{})
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "[SOCKET %d] error: %v\n", id, err)
+        return
+    }
+    if captcha != nil {
+        fmt.Printf("[SOCKET %d] solved %d: %s\n", id, captcha.CaptchaID, *captcha.Text)
+    }
+}
+
+func main() {
+    username := os.Getenv("DBC_USERNAME")
+    password := os.Getenv("DBC_PASSWORD")
+
+    var wg sync.WaitGroup
+    for i := 1; i <= 4; i++ {
+        wg.Add(1)
+        go socketWorker(username, password, "images/normal.jpg", i, &wg)
+    }
+    wg.Wait()
+}
+```
+
+> Full runnable example: [examples/example.Goroutine_Socket.go](examples/example.Goroutine_Socket.go)
+
+#### Running the concurrent examples
+
+```bash
+# HTTP — 4 goroutines, balance-check mode
+DBC_USERNAME=user DBC_PASSWORD=pass DBC_THREADS=4 \
+  go run examples/example.Goroutine_Http.go
+
+# HTTP — 4 goroutines, decode mode
+DBC_USERNAME=user DBC_PASSWORD=pass DBC_THREADS=4 DBC_IMAGE_PATH=examples/images/normal.jpg \
+  go run examples/example.Goroutine_Http.go
+
+# Socket — 4 goroutines, decode mode
+DBC_USERNAME=user DBC_PASSWORD=pass DBC_THREADS=4 DBC_IMAGE_PATH=examples/images/normal.jpg \
+  go run examples/example.Goroutine_Socket.go
 ```
 
 <a id="credentials--configuration"></a>

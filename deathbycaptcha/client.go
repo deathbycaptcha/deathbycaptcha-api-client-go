@@ -189,11 +189,24 @@ func loadImage(captcha interface{}) ([]byte, error) {
 	}
 }
 
-// effectiveTimeout resolves the timeout to use: if t <= 0 and captcha is nil
-// the token timeout is used; otherwise the image timeout is used.
-func effectiveTimeout(t int, isToken bool) int {
+// effectiveTimeout resolves the timeout to use.
+//
+// Rules:
+//   - If t > 0, use it as-is.
+//   - If params["type"] is present and equal to 0, use DefaultTimeout (60).
+//   - If params["type"] is present and not 0, use DefaultTokenTimeout (120).
+//   - Otherwise, fall back to isToken (captcha == nil): token => 120, image => 60.
+func effectiveTimeout(t int, isToken bool, captchaType string) int {
 	if t > 0 {
 		return t
+	}
+	if captchaType != "" {
+		if n, err := strconv.Atoi(captchaType); err == nil {
+			if n == 0 {
+				return DefaultTimeout
+			}
+			return DefaultTokenTimeout
+		}
 	}
 	if isToken {
 		return DefaultTokenTimeout
@@ -731,7 +744,11 @@ func (c *SocketClient) Close() {
 
 func decode(cl Client, captcha interface{}, timeout int, params map[string]string) (*Captcha, error) {
 	isToken := captcha == nil
-	t := effectiveTimeout(timeout, isToken)
+	captchaType := ""
+	if params != nil {
+		captchaType = params["type"]
+	}
+	t := effectiveTimeout(timeout, isToken, captchaType)
 
 	uploaded, err := cl.Upload(captcha, params)
 	if err != nil {
