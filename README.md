@@ -30,7 +30,7 @@ Key features:
 Quick start example (HTTP):
 
 ```go
-import dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/deathbycaptcha"
+import dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha"
 
 client := dbc.NewHttpClient("your_username", "your_password")
 defer client.Close()
@@ -88,7 +88,7 @@ if captcha != nil {
 ### 📦 From pkg.go.dev (Recommended)
 
 ```bash
-go get github.com/deathbycaptcha/deathbycaptcha-api-client-go/deathbycaptcha
+go get github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha
 ```
 
 <a id="from-github-repository"></a>
@@ -111,7 +111,7 @@ go mod download
 All clients must be instantiated with your DeathByCaptcha credentials — either *username* and *password*, or an *authtoken* (available in the DBC user panel). Replace `NewHttpClient` with `NewSocketClient` to use the socket transport instead.
 
 ```go
-import dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/deathbycaptcha"
+import dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha"
 
 // Username + password (HTTPS transport — encrypted, recommended when security matters)
 client := dbc.NewHttpClient(username, password)
@@ -175,7 +175,7 @@ import (
     "log"
     "os"
 
-    dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/deathbycaptcha"
+    dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha"
 )
 
 func main() {

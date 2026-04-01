@@ -12,7 +12,7 @@ import (
 	"os"
 	"testing"
 
-	dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/deathbycaptcha"
+	dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

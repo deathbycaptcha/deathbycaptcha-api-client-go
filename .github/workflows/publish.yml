@@ -38,8 +38,46 @@ jobs:
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME}"
-          MODULE="github.com/deathbycaptcha/deathbycaptcha-api-client-go"
-          echo "Requesting pkg.go.dev to index ${MODULE}@${VERSION}"
-          curl -sSf "https://sum.golang.org/lookup/${MODULE}@${VERSION}" || true
-          curl -sSf "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info" || true
-          echo "pkg.go.dev index request sent for ${MODULE}@${VERSION}" | tee -a "$GITHUB_STEP_SUMMARY"
+          MODULE="github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4"
+
+          # pkg.go.dev ingests from proxy.golang.org. Requesting @latest is always valid for indexing.
+          echo "Requesting pkg.go.dev indexing for ${MODULE}"
+          latest_status="ok"
+          if ! curl -sSf "https://proxy.golang.org/${MODULE}/@latest" >/dev/null; then
+            latest_status="failed"
+          fi
+
+          # If this workflow runs from a release tag, request the tagged version when it is module-path compatible.
+          # Go modules require /vN suffix in module path for N >= 2.
+          tagged_status="skipped"
+          if [[ -n "${VERSION}" ]]; then
+            if [[ "${VERSION}" =~ ^v([0-9]+)\.[0-9]+\.[0-9]+([-.].*)?$ ]]; then
+              major="${BASH_REMATCH[1]}"
+              if (( major <= 1 )) || [[ "${MODULE}" =~ /v${major}$ ]]; then
+                tagged_status="ok"
+                if ! curl -sSf "https://proxy.golang.org/${MODULE}/@v/${VERSION}.info" >/dev/null; then
+                  tagged_status="failed"
+                else
+                  # SumDB lookup is optional but helps warm checksum data.
+                  curl -sSf "https://sum.golang.org/lookup/${MODULE}@${VERSION}" >/dev/null || true
+                fi
+              else
+                tagged_status="skipped-major-version-mismatch"
+                echo "Skipping tagged request for ${VERSION}: module path ${MODULE} is not /v${major}."
+              fi
+            else
+              tagged_status="skipped-non-semver-tag"
+              echo "Skipping tagged request: ${VERSION} is not a valid semver tag (vMAJOR.MINOR.PATCH)."
+            fi
+          fi
+
+          {
+            echo "## pkg.go.dev index trigger"
+            echo "- Module: ${MODULE}"
+            echo "- Release ref: ${VERSION:-n/a}"
+            echo "- @latest request: ${latest_status}"
+            echo "- tagged request: ${tagged_status}"
+            if [[ "${tagged_status}" == "skipped-major-version-mismatch" ]]; then
+              echo "- Note: tags v2+ require module path suffix /vN in go.mod (for example: module ${MODULE}/v2)."
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"

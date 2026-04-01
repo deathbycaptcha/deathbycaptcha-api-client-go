@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/deathbycaptcha"
+	dbc "github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4/deathbycaptcha"
 )
 
 func main() {

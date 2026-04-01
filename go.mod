@@ -1,4 +1,4 @@
-module github.com/deathbycaptcha/deathbycaptcha-api-client-go
+module github.com/deathbycaptcha/deathbycaptcha-api-client-go/v4
 
 go 1.21
 
