@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.1] - 2026-04-02
+
+### Fixed
+
+- **Socket protocol bug** — the socket client was using a null byte (`0x00`) as
+  the frame terminator instead of the correct `\r\n` (CRLF) delimiter defined
+  by the DBC socket API protocol. This caused every socket operation
+  (`GetBalance`, `GetUser`, `Upload`, `Decode`, …) to hang indefinitely because
+  the server never sends a null byte. The client now sends and receives frames
+  delimited by `\r\n`, matching the reference Python client (`TERMINATOR = b'\r\n'`).
+- **Socket read hang** — added `SetReadDeadline` (60 s) on every `recv()` call so
+  the goroutine can never block forever even if the server goes silent.
+- **Mock socket server in tests** — the test helper was also using the wrong
+  `0x00` terminator, masking the bug. Replaced with `bufio.Scanner` + `\r\n`
+  to match the real protocol.
+- **Socket integration tests added** — `tests/integration/` now includes three
+  live-API tests (`TestIntegration_Socket_Balance`, `TestIntegration_Socket_UserInfo`,
+  `TestIntegration_Socket_Status`) that exercise the full
+  connect → login → command round-trip over a real TCP connection.
+
+---
+
 ## [4.7.0] - 2026-04-01
 
 ### Added
