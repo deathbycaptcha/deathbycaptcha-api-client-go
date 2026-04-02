@@ -10,6 +10,7 @@
 package deathbycaptcha
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -489,29 +490,46 @@ func (c *SocketClient) connect() error {
 	return nil
 }
 
-// send serializes data as JSON, appends a null byte, and writes to the socket.
+// socketWriteTimeout is the per-write deadline for socket operations.
+const socketWriteTimeout = 15 * time.Second
+
+// socketReadTimeout is the per-read deadline for socket operations.
+// 60 s is generous enough for any normal server response.
+const socketReadTimeout = 60 * time.Second
+
+// socketTerminator is the CRLF frame delimiter used by the DBC socket API.
+var socketTerminator = []byte("\r\n")
+
+// send serializes data as JSON, appends the CRLF frame terminator, and writes
+// to the socket. The server protocol uses \r\n as the frame boundary.
 func (c *SocketClient) send(data map[string]interface{}) error {
 	data["version"] = APIVersion
 	b, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	b = append(b, 0x00) // null-byte frame terminator
+	b = append(b, socketTerminator...)
+	c.conn.SetWriteDeadline(time.Now().Add(socketWriteTimeout)) //nolint:errcheck
 	_, err = c.conn.Write(b)
 	return err
 }
 
-// recv reads from the socket until a null byte is received, then unmarshals JSON.
+// recv reads from the socket until the CRLF frame terminator is received,
+// then unmarshals the JSON payload. A read deadline is set on every call so
+// the goroutine never blocks forever if the server goes silent.
 func (c *SocketClient) recv() (map[string]interface{}, error) {
+	c.conn.SetReadDeadline(time.Now().Add(socketReadTimeout)) //nolint:errcheck
 	var buf []byte
 	tmp := make([]byte, 256)
 	for {
 		n, err := c.conn.Read(tmp)
-		if err != nil {
-			return nil, err
+		if n > 0 {
+			buf = append(buf, tmp[:n]...)
 		}
-		buf = append(buf, tmp[:n]...)
-		if idx := strings.IndexByte(string(buf), 0x00); idx >= 0 {
+		if err != nil {
+			return nil, fmt.Errorf("deathbycaptcha: socket read: %w", err)
+		}
+		if idx := bytes.Index(buf, socketTerminator); idx >= 0 {
 			buf = buf[:idx]
 			break
 		}

@@ -1,6 +1,7 @@
 package deathbycaptcha_test
 
 import (
+	"bufio"
 	"encoding/json"
 	"io"
 	"net"
@@ -528,14 +529,10 @@ func (s *mockSocketServer) serve() {
 
 func (s *mockSocketServer) handleConn(conn net.Conn) {
 	defer conn.Close()
-	buf := make([]byte, 4096)
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			return
-		}
-		// Trim null terminator
-		_ = buf[:n]
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		// scanner.Scan() returns one line (strips the \n delimiter).
+		// The client sends JSON + \r\n; Scanner strips \n, leaving possible \r.
 		s.mu.Lock()
 		if s.idx >= len(s.responses) {
 			s.mu.Unlock()
@@ -546,18 +543,18 @@ func (s *mockSocketServer) handleConn(conn net.Conn) {
 		s.mu.Unlock()
 
 		b, _ := json.Marshal(resp)
-		b = append(b, 0x00)
-		conn.Write(b)
+		b = append(b, '\r', '\n') // CRLF frame terminator (matches socketTerminator)
+		conn.Write(b)             //nolint:errcheck
 	}
 }
 
 func (s *mockSocketServer) Close() { s.ln.Close() }
 
 // ---------------------------------------------------------------------------
-// SocketClient — serialization: JSON + null terminator
+// SocketClient — serialization: JSON + CRLF terminator
 // ---------------------------------------------------------------------------
 
-func TestSocketClient_FrameHasNullTerminator(t *testing.T) {
+func TestSocketClient_FrameHasCRLF(t *testing.T) {
 	// The mock server simply echoes the login response back
 	loginResp := map[string]interface{}{
 		"user":      float64(99),
