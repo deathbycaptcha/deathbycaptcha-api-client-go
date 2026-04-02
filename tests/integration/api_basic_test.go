@@ -72,3 +72,45 @@ func TestIntegration_DecodeImage(t *testing.T) {
 	require.NotNil(t, cap, "expected a solved captcha, got nil (timeout)")
 	assert.NotEmpty(t, *cap.Text, "solved text should not be empty")
 }
+
+// ---------------------------------------------------------------------------
+// Socket client integration tests
+// ---------------------------------------------------------------------------
+
+// TestIntegration_Socket_Balance verifies the socket client can authenticate
+// and retrieve the account balance over a real TCP connection.
+func TestIntegration_Socket_Balance(t *testing.T) {
+	user, pass := credentials(t)
+	c := dbc.NewSocketClient(user, pass)
+	defer c.Close()
+
+	bal, err := c.GetBalance()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, bal, 0.0, "balance should be >= 0")
+}
+
+// TestIntegration_Socket_UserInfo verifies the socket client returns a valid user.
+func TestIntegration_Socket_UserInfo(t *testing.T) {
+	user, pass := credentials(t)
+	c := dbc.NewSocketClient(user, pass)
+	defer c.Close()
+
+	u, err := c.GetUser()
+	require.NoError(t, err)
+	assert.NotZero(t, u.UserID, "user_id should be non-zero")
+	assert.False(t, u.IsBanned, "account should not be banned")
+}
+
+// TestIntegration_Socket_Status verifies the socket client can check service status.
+// Note: the socket API does not have a dedicated status endpoint; this test
+// validates liveness by checking that GetUser succeeds (implicitly tests the
+// full connect → login → user command round-trip).
+func TestIntegration_Socket_Status(t *testing.T) {
+	user, pass := credentials(t)
+	c := dbc.NewSocketClient(user, pass)
+	defer c.Close()
+
+	u, err := c.GetUser()
+	require.NoError(t, err)
+	assert.NotZero(t, u.UserID, "user_id should be non-zero (socket liveness check)")
+}
